@@ -116,22 +116,36 @@ export function SmartInput({ items, onAdd, onEdit, onDelete, onSearch }: SmartIn
         content: m.content
       }))
 
+      // Call Places API first to get real data
+      let placesData = ''
+      try {
+        const placesResponse = await fetch('/api/places', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: userInput })
+        })
+        const placesResult = await placesResponse.json()
+        if (placesResult.results?.length > 0) {
+          placesData = `\n\nGOOGLE PLACES API RESULTS (use this real data!):\n${placesResult.results.map((p: { name: string; type: string; address: string; neighborhood: string; rating: number; reviewCount: number; priceRange: string; mapsUrl: string }) =>
+            `- ${p.name} (${p.type}) - ${p.address}
+   Rating: ${p.rating ? `${p.rating}/5 (${p.reviewCount} reviews)` : 'N/A'}
+   Price: ${p.priceRange || 'N/A'}
+   Maps: ${p.mapsUrl}`
+          ).join('\n')}`
+        }
+      } catch (e) {
+        console.error('Places API error:', e)
+      }
+
       const systemPrompt = `You are a helpful assistant for a NYC-focused friends list app. Users add restaurants, bars, clubs, and activities.
 
 CURRENT LIST:
-${itemsList || '(empty)'}
+${itemsList || '(empty)'}${placesData}
 
 YOUR JOB:
-1. When a user mentions ANY place name, SEARCH THE WEB to find accurate information
-2. When a user asks for RECOMMENDATIONS (e.g., "find me bars in east village", "best pizza spots"), provide MULTIPLE options (3-5)
-3. Use web search to find: official name, address, neighborhood, type, price range, what it's known for
-4. ONLY ask clarifying questions if search returns nothing or user request is truly ambiguous
-
-SEARCH FIRST RULE:
-- NEVER ask "what is X?" if you can search for it
-- User says "Carbone" → Search → Find info → Propose
-- User says "bars in east village" → Search → Return 3-5 recommendations
-- User says "that new place" → Search for new restaurants/bars in NYC → If multiple, ask which type
+1. USE THE GOOGLE PLACES DATA ABOVE if available - it has real ratings and reviews!
+2. When a user asks for RECOMMENDATIONS, provide ALL options from the Places data (up to 10). If user specifies a number, provide that many.
+3. ONLY ask clarifying questions if no places were found and request is ambiguous
 
 CRITICAL RESPONSE FORMAT RULES:
 1. You MUST wrap JSON in triple backticks with the label
@@ -148,7 +162,7 @@ Then output:
   "action": "add",
   "text": "Place Name",
   "category": "Food",
-  "link": "https://google.com/maps/search/Place+Name+NYC",
+  "link": "https://www.google.com/maps/...",
   "place": {
     "name": "Official Name",
     "type": "Restaurant",
@@ -157,7 +171,9 @@ Then output:
     "description": "Brief description",
     "knownFor": "What it's famous for",
     "priceRange": "$$",
-    "tips": "Useful tip"
+    "tips": "Useful tip",
+    "rating": 4.5,
+    "reviewCount": 1234
   }
 }
 \`\`\`
@@ -170,14 +186,14 @@ Then output:
   {
     "text": "Place 1",
     "category": "Nightlife",
-    "link": "https://google.com/maps/search/Place1+NYC",
-    "place": {"name": "Place 1", "type": "Bar", "neighborhood": "East Village", "priceRange": "$$", "knownFor": "craft cocktails", "tips": "come early"}
+    "link": "https://www.google.com/maps/...",
+    "place": {"name": "Place 1", "type": "Bar", "neighborhood": "East Village", "priceRange": "$$", "knownFor": "craft cocktails", "tips": "come early", "rating": 4.5, "reviewCount": 500}
   },
   {
     "text": "Place 2",
     "category": "Nightlife",
-    "link": "https://google.com/maps/search/Place2+NYC",
-    "place": {"name": "Place 2", "type": "Bar", "neighborhood": "East Village", "priceRange": "$", "knownFor": "dive bar vibes", "tips": "cash only"}
+    "link": "https://www.google.com/maps/...",
+    "place": {"name": "Place 2", "type": "Bar", "neighborhood": "East Village", "priceRange": "$", "knownFor": "dive bar vibes", "tips": "cash only", "rating": 4.2, "reviewCount": 300}
   }
 ]
 \`\`\`
@@ -188,6 +204,7 @@ For EDIT: use "action": "edit" and include "editItemId" matching the item's ID f
 For DELETE: use "action": "delete" and include "editItemId".
 For SEARCH (filtering the list): use "action": "search" with "text" as the search query.
 
+IMPORTANT: Always include "rating" and "reviewCount" from the Places API data. Use the real Maps URL provided.
 REMEMBER: Always use \`\`\`action or \`\`\`recommendations wrapper. Never output bare JSON.`
 
       const response = await chatWithGrok([

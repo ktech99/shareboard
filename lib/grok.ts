@@ -65,6 +65,8 @@ export async function searchPlace(query: string, type?: string): Promise<PlaceIn
       knownFor: data.knownFor || null,
       priceRange: data.priceRange || null,
       tips: data.tips || null,
+      rating: data.rating || null,
+      reviewCount: data.reviewCount || null,
     }
   } catch (error) {
     console.error('Error searching place:', error)

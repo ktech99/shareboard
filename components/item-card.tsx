@@ -1,7 +1,8 @@
 'use client'
 
-import { motion } from 'framer-motion'
-import { ExternalLink, Check, RotateCcw, Trash2, MapPin, DollarSign } from 'lucide-react'
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { ExternalLink, Check, RotateCcw, Trash2, MapPin, DollarSign, Star, ChevronDown, ChevronUp } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -24,7 +25,9 @@ const categoryVariants: Record<string, 'activity' | 'food' | 'travel' | 'enterta
 }
 
 export function ItemCard({ item, onToggleDone, onDelete }: ItemCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false)
   const badgeVariant = categoryVariants[item.category] || 'other'
+  const hasExpandableContent = item.place && (item.place.address || item.place.description || item.place.tips)
 
   return (
     <motion.div
@@ -59,10 +62,22 @@ export function ItemCard({ item, onToggleDone, onDelete }: ItemCardProps) {
                 {item.text}
               </p>
 
-              {/* Place details */}
+              {/* Rating and basic info - always visible */}
               {item.place && (
                 <div className="mt-2 space-y-1">
                   <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                    {/* Rating */}
+                    {item.place.rating && (
+                      <span className="flex items-center gap-1 text-amber-500 font-medium">
+                        <Star className="w-3 h-3 fill-current" />
+                        {item.place.rating}
+                        {item.place.reviewCount && (
+                          <span className="text-muted-foreground font-normal">
+                            ({item.place.reviewCount.toLocaleString()})
+                          </span>
+                        )}
+                      </span>
+                    )}
                     {item.place.neighborhood && (
                       <span className="flex items-center gap-1">
                         <MapPin className="w-3 h-3" />
@@ -77,22 +92,66 @@ export function ItemCard({ item, onToggleDone, onDelete }: ItemCardProps) {
                     )}
                   </div>
 
+                  {/* Known for - always visible */}
                   {item.place.knownFor && (
-                    <p className="text-xs text-muted-foreground line-clamp-2">
+                    <p className={`text-xs text-muted-foreground ${isExpanded ? '' : 'line-clamp-1'}`}>
                       {item.place.knownFor}
-                    </p>
-                  )}
-
-                  {item.place.tips && (
-                    <p className="text-xs text-primary/70 italic line-clamp-1">
-                      💡 {item.place.tips}
                     </p>
                   )}
                 </div>
               )}
 
-              {/* Link */}
-              {item.link && (
+              {/* Expandable content */}
+              <AnimatePresence>
+                {isExpanded && item.place && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-3 pt-3 border-t border-border/50 space-y-2">
+                      {/* Full address */}
+                      {item.place.address && (
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-medium">Address:</span> {item.place.address}
+                        </p>
+                      )}
+
+                      {/* Description */}
+                      {item.place.description && (
+                        <p className="text-xs text-muted-foreground">
+                          {item.place.description}
+                        </p>
+                      )}
+
+                      {/* Tips */}
+                      {item.place.tips && (
+                        <p className="text-xs text-primary/70 italic">
+                          💡 {item.place.tips}
+                        </p>
+                      )}
+
+                      {/* Link */}
+                      {item.link && (
+                        <a
+                          href={item.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          View on Google Maps
+                        </a>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Link when not expanded and no expandable content */}
+              {!isExpanded && item.link && !hasExpandableContent && (
                 <a
                   href={item.link}
                   target="_blank"
@@ -107,6 +166,20 @@ export function ItemCard({ item, onToggleDone, onDelete }: ItemCardProps) {
 
             {/* Actions */}
             <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {hasExpandableContent && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setIsExpanded(!isExpanded)}
+                >
+                  {isExpanded ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"

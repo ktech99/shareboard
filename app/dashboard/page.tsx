@@ -142,6 +142,15 @@ export default function DashboardPage() {
 
   const doneCount = items.filter((item) => item.done).length
 
+  // Count items per category (excluding done items unless showDone is true)
+  const categoryCounts = useMemo(() => {
+    const baseItems = showDone ? items : items.filter(i => !i.done)
+    return categories.reduce((acc, cat) => {
+      acc[cat] = baseItems.filter(item => item.category === cat).length
+      return acc
+    }, {} as Record<string, number>)
+  }, [items, showDone])
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -211,22 +220,34 @@ export default function DashboardPage() {
 
             {/* Category filters */}
             <div className="flex items-center gap-2 flex-wrap flex-1">
-              {categories.map((category) => (
-                <Badge
-                  key={category}
-                  variant={categoryFilter === category ? 'default' : 'outline'}
-                  className={`cursor-pointer transition-all ${
-                    categoryFilter === category
-                      ? 'bg-primary text-primary-foreground'
-                      : 'hover:bg-secondary'
-                  }`}
-                  onClick={() =>
-                    setCategoryFilter(categoryFilter === category ? null : category)
-                  }
-                >
-                  {category}
-                </Badge>
-              ))}
+              {categories.map((category) => {
+                const count = categoryCounts[category] || 0
+                const isActive = categoryFilter === category
+                return (
+                  <button
+                    key={category}
+                    onClick={() =>
+                      setCategoryFilter(isActive ? null : category)
+                    }
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                      isActive
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'bg-secondary/50 text-muted-foreground hover:bg-secondary hover:text-foreground'
+                    }`}
+                  >
+                    {category}
+                    {count > 0 && (
+                      <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold ${
+                        isActive
+                          ? 'bg-primary-foreground/20 text-primary-foreground'
+                          : 'bg-background text-muted-foreground'
+                      }`}>
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
 
               {/* Clear all filters */}
               {hasActiveFilters && (
@@ -234,7 +255,7 @@ export default function DashboardPage() {
                   variant="ghost"
                   size="sm"
                   onClick={clearFilters}
-                  className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                 >
                   <X className="w-3 h-3 mr-1" />
                   Clear

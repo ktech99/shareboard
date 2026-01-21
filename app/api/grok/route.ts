@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
 
     // Build request with search tool enabled
     const requestBody: Record<string, unknown> = {
-      model: 'grok-3-latest',
+      model: 'grok-4-1-fast-non-reasoning',
       messages: messages,
       temperature: 0.7,
       max_tokens: 2048,
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
             'Authorization': `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
-            model: 'grok-3-latest',
+            model: 'grok-4-1-fast-non-reasoning',
             messages: searchMessages,
             temperature: 0.7,
             max_tokens: 2048,

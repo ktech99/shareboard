@@ -22,6 +22,8 @@ export interface PlaceInfo {
   knownFor: string | null
   priceRange: string | null
   tips: string | null
+  rating: number | null
+  reviewCount: number | null
 }
 
 export interface Item {
