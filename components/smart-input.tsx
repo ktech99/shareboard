@@ -116,36 +116,70 @@ export function SmartInput({ items, onAdd, onEdit, onDelete, onSearch }: SmartIn
         content: m.content
       }))
 
-      // Call Places API first to get real data
+      // Detect URLs in user input
+      const urlRegex = /(https?:\/\/[^\s]+)/g
+      const urls = userInput.match(urlRegex) || []
+      let scrapedContent = ''
+
+      // Scrape any URLs found
+      if (urls.length > 0) {
+        try {
+          for (const url of urls.slice(0, 2)) { // Limit to 2 URLs
+            const scrapeResponse = await fetch('/api/scrape', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url })
+            })
+            const scrapeResult = await scrapeResponse.json()
+            if (scrapeResult.content) {
+              scrapedContent += `\n\nCONTENT FROM URL (${scrapeResult.title || url}):\n${scrapeResult.content}`
+            }
+          }
+        } catch (e) {
+          console.error('Scrape error:', e)
+        }
+      }
+
+      // Call Places API first to get real data (skip if we have scraped content with place names)
       let placesData = ''
-      try {
-        const placesResponse = await fetch('/api/places', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: userInput })
-        })
-        const placesResult = await placesResponse.json()
-        if (placesResult.results?.length > 0) {
-          placesData = `\n\nGOOGLE PLACES API RESULTS (use this real data!):\n${placesResult.results.map((p: { name: string; type: string; address: string; neighborhood: string; rating: number; reviewCount: number; priceRange: string; mapsUrl: string }) =>
-            `- ${p.name} (${p.type}) - ${p.address}
+      if (!scrapedContent) {
+        try {
+          const placesResponse = await fetch('/api/places', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: userInput })
+          })
+          const placesResult = await placesResponse.json()
+          if (placesResult.results?.length > 0) {
+            placesData = `\n\nGOOGLE PLACES API RESULTS (use this real data!):\n${placesResult.results.map((p: { name: string; type: string; address: string; neighborhood: string; rating: number; reviewCount: number; priceRange: string; mapsUrl: string }) =>
+              `- ${p.name} (${p.type}) - ${p.address}
    Rating: ${p.rating ? `${p.rating}/5 (${p.reviewCount} reviews)` : 'N/A'}
    Price: ${p.priceRange || 'N/A'}
    Maps: ${p.mapsUrl}`
-          ).join('\n')}`
+            ).join('\n')}`
+          }
+        } catch (e) {
+          console.error('Places API error:', e)
         }
-      } catch (e) {
-        console.error('Places API error:', e)
       }
 
       const systemPrompt = `You are a helpful assistant for a NYC-focused friends list app. Users add restaurants, bars, clubs, and activities.
 
 CURRENT LIST:
-${itemsList || '(empty)'}${placesData}
+${itemsList || '(empty)'}${placesData}${scrapedContent}
 
 YOUR JOB:
-1. USE THE GOOGLE PLACES DATA ABOVE if available - it has real ratings and reviews!
-2. When a user asks for RECOMMENDATIONS, provide ALL options from the Places data (up to 10). If user specifies a number, provide that many.
-3. ONLY ask clarifying questions if no places were found and request is ambiguous
+1. If CONTENT FROM URL is provided above, extract ALL place names (restaurants, bars, clubs, etc.) mentioned and return them as recommendations
+2. USE THE GOOGLE PLACES DATA ABOVE if available - it has real ratings and reviews!
+3. When a user asks for RECOMMENDATIONS, provide ALL options (up to 10). If user specifies a number, provide that many.
+4. ONLY ask clarifying questions if no places were found and request is ambiguous
+
+URL CONTENT HANDLING:
+- If the user pastes a URL, the content has been scraped and provided above
+- Extract ALL place names from the article/page content
+- For each place found, create a recommendation with category based on type (restaurant=Food, bar/club=Nightlife, etc.)
+- Generate Google Maps links for each place
+- If the content mentions NYC places, extract and recommend them all
 
 CRITICAL RESPONSE FORMAT RULES:
 1. You MUST wrap JSON in triple backticks with the label
